@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+      <style type="text/css">
+        body { font-family: Helvetica, sans-serif; }
+        h2, h3 { margin-top:0; }
+        form { margin-top: 15px; }
+        form > input { margin-right: 15px; }
+        #my_camera { margin:20px; padding:20px; border:1px solid; background:#ccc; width:340px}
+        #results { margin:20px; padding:20px; border:1px solid; background:#ccc; width:340px}
+    </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+
+</head>
+
+  <title>Object image recognition</title>
+</head>
+<body>
+  <h1>Object recognition!</h1>
+  <!-- A button for taking snaps -->
+    <div id="my_camera">
+    </div><br>
+    <input type=button value="Take Snapshot" onClick="take_snapshot()">
+
+    <br>
+    <br>
+    <div>Objects found in image:</div>
+    <div id="results" ></div>
+
+  <script type="text/javascript" src="js/webcam.min.js"></script>
+  <script language="JavaScript">
+    Webcam.set({
+        width: 320,
+        height: 240,
+        image_format: 'jpeg',
+        jpeg_quality: 90
+    });
+    Webcam.attach( '#my_camera' );
+    function take_snapshot() {
+        // take snapshot and get image data
+        Webcam.snap( function(data_uri) {
+            //publish to yolo3 image recog
+        publish(myTopic, data_uri)
+
+        } );
+    }
+
+
+    function onConnect() {
+      console.log("connection successful")
+      client.subscribe(sendTo)
+      client.subscribe(sendToJSON)
+    }
+    
+    const publish = (topic, msg) => {  //takes topic and message string
+      let message = new Paho.MQTT.Message(msg);
+      message.destinationName = topic;
+      client.send(message);
+    }
+
+    function onConnectionLost(responseObject) {
+      if (responseObject.errorCode !== 0) {
+        console.log("onConnectionLost:" + responseObject.errorMessage);
+      }
+      client.connect({ onSuccess: onConnect });
+    }
+
+    function onMessageArrived(message) {
+        console.log("msg",message)
+        // console.log("Got message on topic " + message.destinationName + " with payload: " + message.payloadString);
+       
+        if(message.destinationName===sendTo){
+            var element = document.getElementById("imageReplied");
+
+            element ? element.parentNode.removeChild(element) : null
+
+            let el= document.createElement('img')
+            el.setAttribute("id","imageReplied")
+            el.setAttribute("src",`${message.payloadString}`)
+            document.body.appendChild(el)
+        }
+        if(message.destinationName===sendToJSON){
+            var textToSpeak = ""
+            var msg = (JSON.parse(message.payloadString))
+            msg.forEach(array=>{
+
+            document.getElementById('results').innerHTML += 
+                `<h2> ${array[0]}</h2>` ;
+                
+        
+            textToSpeak += array [0] + "   "
+            }
+            )
+            
+
+            function speak(text) {
+            speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+             }
+
+             speak(` AI image recognition found ${textToSpeak} in the image. `)
+             
+        }
+
+    }
+  
+//    const client = new Paho.MQTT.Client("ws://mqtt.eclipse.org/mqtt", "myJSClientId" + new Date().getTime());
+const client = new Paho.MQTT.Client("ws://test.mosquitto.org:8080/mqtt", "kth/dm2518/yolo3/amg1337/imgb64" + new Date().getTime());
+    const myTopic = "kth/dm2518/yolo3/amg1337/imgb64";
+    const sendTo = "kth/dm2518/reply/yolo3/amg1337/imgb64";
+    const sendToJSON = "kth/dm2518/reply/yolo3/amg1337/json";
+    
+    client.onMessageArrived = onMessageArrived;
+    client.onConnectionLost = onConnectionLost;
+    client.connect({ onSuccess: onConnect });
+  </script>
+</script>
+
+</body>
+</html>
